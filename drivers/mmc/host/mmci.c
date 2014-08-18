@@ -81,6 +81,7 @@ static unsigned int fmax = 515633;
  * @explicit_mclk_control: enable explicit mclk control in driver.
  * @qcom_fifo: enables qcom specific fifo pio read logic.
  * @qcom_dml: enables qcom specific dma glue for dma transfers.
+ * @any_blksize: true if block any sizes are supported
  * @reversed_irq_handling: handle data irq before cmd irq.
  * @mmcimask1: true if variant have a MMCIMASK1 register.
  * @start_err: bitmask identifying the STARTBITERR bit inside MMCISTATUS
@@ -114,6 +115,7 @@ struct variant_data {
 	bool			explicit_mclk_control;
 	bool			qcom_fifo;
 	bool			qcom_dml;
+	bool			any_blksize;
 	bool			reversed_irq_handling;
 	bool			mmcimask1;
 	u32			start_err;
@@ -238,6 +240,7 @@ static struct variant_data variant_ux500v2 = {
 	.busy_dpsm_flag		= MCI_DPSM_ST_BUSYMODE,
 	.busy_detect_flag	= MCI_ST_CARDBUSY,
 	.busy_detect_mask	= MCI_ST_BUSYENDMASK,
+	.any_blksize		= true,
 	.pwrreg_nopower		= true,
 	.mmcimask1		= true,
 	.start_err		= MCI_STARTBITERR,
@@ -275,6 +278,7 @@ static struct variant_data variant_qcom = {
 	.pwrreg_powerup		= MCI_PWR_UP,
 	.f_max			= 208000000,
 	.explicit_mclk_control	= true,
+	.any_blksize		= true,
 	.qcom_fifo		= true,
 	.qcom_dml		= true,
 	.mmcimask1		= true,
@@ -303,10 +307,11 @@ static int mmci_card_busy(struct mmc_host *mmc)
 static int mmci_validate_data(struct mmci_host *host,
 			      struct mmc_data *data)
 {
+	struct variant_data *variant = host->variant;
+
 	if (!data)
 		return 0;
-
-	if (!is_power_of_2(data->blksz)) {
+	if (!is_power_of_2(data->blksz) && !variant->any_blksize) {
 		dev_err(mmc_dev(host->mmc),
 			"unsupported block size (%d bytes)\n", data->blksz);
 		return -EINVAL;
@@ -863,7 +868,6 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	writel(host->size, base + MMCIDATALENGTH);
 
 	blksz_bits = ffs(data->blksz) - 1;
-	BUG_ON(1 << blksz_bits != data->blksz);
 
 	if (variant->blksz_datactrl16)
 		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
