@@ -23,6 +23,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/qcom-geni-se.h>
 #include <linux/spinlock.h>
+#include <linux/pinctrl/consumer.h>
 
 #define MAX_CLK_PERF_LEVEL 32
 
